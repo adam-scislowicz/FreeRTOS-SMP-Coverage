@@ -36,6 +36,7 @@
 #include "FreeRTOSConfig.h"
 #include "event_groups.h"
 #include "queue.h"
+//#include "portasm.h"
 
 /* Test includes. */
 #include "unity.h"
@@ -47,8 +48,6 @@
 #include "mock_timers.h"
 #include "mock_fake_assert.h"
 #include "mock_fake_port.h"
-
-#define taskTASK_YIELDING       ( TaskRunning_t ) ( -2 )
 
 
 /* ===========================  EXTERN VARIABLES  =========================== */
@@ -101,8 +100,8 @@ The kernel will be configured as follows:
     #define configUSE_TASK_PREEMPTION_DISABLE               1
 
 Coverage for 
-        static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB )
-        covers the case where the task being created is not the first or only task.
+    static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB )
+    covers the case where the task being created is not the first or only task.
 */
 void test_create_two_tasks_with_the_first_suspended( void )
 {
@@ -123,8 +122,20 @@ The kernel will be configured as follows:
     #define configUSE_TASK_PREEMPTION_DISABLE               1
 
 Coverage for 
-        static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB )
-        covers the case where there coreID is out of bounds when looking for a TCB
+    static void prvAddNewTaskToReadyList( TCB_t * pxNewTCB )
+    covers the case where there coreID is out of bounds when looking for a TCB
+
+Notes:
+    The prvAddNewTaskToReadyList function contained a subsection that is called
+    when the scheudler is not active. Furthermore it contains a loop which
+    is called only when the IDLE attribute of a task is set. As new tasks do not begin
+    with the IDLE attribute set, combined with the use of break on finding a free slot
+    and the entrance paths not calling the function in a way wich will reach the
+    for loops boundary condition. It is not currently reachable. One potential
+    fix would be to create new tasks with the IDLE attribute set when the scheduler
+    if not active. The other simple approach would be to avoid the break in the for
+    loop, but that would waste soe cycles. This note remains until a solution
+    is found.
 */
 
 void vSmpForeverTestTask( void *pvParameters )
@@ -179,9 +190,9 @@ The kernel will be configured as follows:
     #define configUSE_CORE_AFFINITY                         1
 
 Coverage for 
-void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
-        covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
-        implicitly referring to the current task.
+    void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+    covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
+    implicitly referring to the current task.
 */
 
 void vSmpTestTaskSetAffinity( void *pvParameters )
@@ -208,9 +219,9 @@ The kernel will be configured as follows:
     #define configUSE_CORE_AFFINITY                         1
 
 Coverage for 
-void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
-        covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
-        implicitly referring to the current task.
+    void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+    covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
+    implicitly referring to the current task.
 */
 
 void test_task_core_affinity_set_task_explicit( void )
@@ -229,7 +240,7 @@ The kernel will be configured as follows:
     #define configUSE_CORE_AFFINITY                         1
 
 Coverage for 
-void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+    void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
     covers the case where the affinity mask no longer includes the current core, triggering a yield
 */
 
@@ -237,7 +248,6 @@ void vSmpTestTaskChangeAffinity( void *pvParameters )
 {
     vTaskDelay(pdMS_TO_TICKS(100));
     vTaskCoreAffinitySet(NULL, (UBaseType_t)0x2);
-    vTaskDelay(pdMS_TO_TICKS(100));
 
     for(;;)
     {
@@ -254,6 +264,92 @@ void test_task_core_affinity_change_while_running( void )
     vTaskStartScheduler();
 }
 
+/*
+The kernel will be configured as follows:
+    #define configNUMBER_OF_CORES                           (N > 1)
+    #define configUSE_CORE_AFFINITY                         1
 
-//  if( taskTASK_IS_RUNNING( pxTCB ) == pdTRUE )
-// 
+Coverage for 
+    void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+    Changes the affinity of a suspended task such that it must yield on the core
+    it was originally running.
+*/
+
+void vSmpTestTaskA( void *pvParameters )
+{
+    printf("XXXADS DEBUG SMP TEST TASK A\n");
+    for(;;)
+    {
+    }
+}
+
+void vSmpTestTaskB( void *pvParameters )
+{
+    TaskHandle_t taskA = (TaskHandle_t) pvParameters;
+
+    printf("XXXADS DEBUG SMP TEST TASK B\n");
+
+    vTaskSuspend(taskA);
+    vTaskCoreAffinitySet(taskA, (UBaseType_t)0x2);
+    vTaskCoreAffinitySet(taskA, (UBaseType_t)0x3);
+
+    printf("XXXADS DEBUG SMP TEST TASK B GOING IDLE\n");
+
+    for(;;)
+    {
+    }
+}
+
+void test_task_core_affinity_change_while_suspended( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    UBaseType_t xidx, xtick;
+
+    xTaskCreate( vSmpTestTaskA, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0]);
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x1);
+    xTaskCreate( vSmpTestTaskB, "SMP Task", configMINIMAL_STACK_SIZE, xTaskHandles[0], 2, &xTaskHandles[1]);
+
+    vTaskStartScheduler();
+
+    for(xtick = 0; xtick < 10000; xtick++)
+    {
+        for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+            xTaskIncrementTick_helper();
+
+            for (int j = 0; j < 2; j++) {
+                verifySmpTask( &xTaskHandles[j], eRunning, j );
+            }
+        }
+    }
+}
+
+/*
+The kernel will be configured as follows:
+    #define configNUMBER_OF_CORES                           (N > 1)
+    #define configUSE_CORE_AFFINITY                         1
+
+Coverage for
+    void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+    Given #define taskTASK_IS_RUNNING( pxTCB )     ( ( pxTCB->xTaskRunState >= 0 ) && ( pxTCB->xTaskRunState < configNUMBER_OF_CORES ) )
+    Call the above macro where the second expression evaluates to false.
+*/
+
+void vSmpTestTaskSetAffinityWithInvalidRunningCore( void *pvParameters )
+{
+    //pxCurrentTCB.xTaskRunState = configNUMBER_OF_CORES+1;
+    vTaskCoreAffinitySet(NULL, (UBaseType_t)0x2);
+
+    for(;;)
+    {
+    }
+}
+
+void test_task_core_affinity_set_with_invalid_running_core( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+
+    xTaskCreate( vSmpTestTaskSetAffinityWithInvalidRunningCore, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x1);
+
+    vTaskStartScheduler();
+}
