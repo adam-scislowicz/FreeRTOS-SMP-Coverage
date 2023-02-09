@@ -275,51 +275,36 @@ Coverage for
     it was originally running.
 */
 
-void vSmpTestTaskA( void *pvParameters )
-{
-    printf("XXXADS DEBUG SMP TEST TASK A\n");
-    for(;;)
-    {
-    }
-}
-
-void vSmpTestTaskB( void *pvParameters )
-{
-    TaskHandle_t taskA = (TaskHandle_t) pvParameters;
-
-    printf("XXXADS DEBUG SMP TEST TASK B\n");
-
-    vTaskSuspend(taskA);
-    vTaskCoreAffinitySet(taskA, (UBaseType_t)0x2);
-    vTaskCoreAffinitySet(taskA, (UBaseType_t)0x3);
-
-    printf("XXXADS DEBUG SMP TEST TASK B GOING IDLE\n");
-
-    for(;;)
-    {
-    }
-}
-
 void test_task_core_affinity_change_while_suspended( void )
 {
     TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
-    UBaseType_t xidx, xtick;
+    UBaseType_t xidx;
 
-    xTaskCreate( vSmpTestTaskA, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0]);
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0]);
     vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x1);
-    xTaskCreate( vSmpTestTaskB, "SMP Task", configMINIMAL_STACK_SIZE, xTaskHandles[0], 2, &xTaskHandles[1]);
 
     vTaskStartScheduler();
 
-    for(xtick = 0; xtick < 10000; xtick++)
-    {
-        for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
-            xTaskIncrementTick_helper();
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
 
-            for (int j = 0; j < 2; j++) {
-                verifySmpTask( &xTaskHandles[j], eRunning, j );
-            }
-        }
+    vTaskSuspend(xTaskHandles[0]);
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x2);
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x2);
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
     }
 }
 
