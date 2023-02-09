@@ -172,3 +172,88 @@ void test_create_more_tasks_than_there_are_cores( void )
     
     show_task_status();
 }
+
+/*
+The kernel will be configured as follows:
+    #define configNUMBER_OF_CORES                           (N > 1)
+    #define configUSE_CORE_AFFINITY                         1
+
+Coverage for 
+void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+        covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
+        implicitly referring to the current task.
+*/
+
+void vSmpTestTaskSetAffinity( void *pvParameters )
+{
+    vTaskCoreAffinitySet(NULL, (UBaseType_t)0xFF);
+
+    for(;;)
+    {
+    }
+}
+
+void test_task_core_affinity_set_task_implied( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+
+    xTaskCreate( vSmpTestTaskSetAffinity, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+
+    vTaskStartScheduler();
+}
+
+/*
+The kernel will be configured as follows:
+    #define configNUMBER_OF_CORES                           (N > 1)
+    #define configUSE_CORE_AFFINITY                         1
+
+Coverage for 
+void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+        covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
+        implicitly referring to the current task.
+*/
+
+void test_task_core_affinity_set_task_explicit( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0]);
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0xFF);
+
+    vTaskStartScheduler();
+}
+
+/*
+The kernel will be configured as follows:
+    #define configNUMBER_OF_CORES                           (N > 1)
+    #define configUSE_CORE_AFFINITY                         1
+
+Coverage for 
+void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
+    covers the case where the affinity mask no longer includes the current core, triggering a yield
+*/
+
+void vSmpTestTaskChangeAffinity( void *pvParameters )
+{
+    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskCoreAffinitySet(NULL, (UBaseType_t)0x2);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    for(;;)
+    {
+    }
+}
+
+void test_task_core_affinity_change_while_running( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+
+    xTaskCreate( vSmpTestTaskChangeAffinity, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0]);
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x1);
+
+    vTaskStartScheduler();
+}
+
+
+//  if( taskTASK_IS_RUNNING( pxTCB ) == pdTRUE )
+// 
