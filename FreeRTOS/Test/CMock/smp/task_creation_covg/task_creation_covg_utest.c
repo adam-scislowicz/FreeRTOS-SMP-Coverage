@@ -138,13 +138,6 @@ Notes:
     is found.
 */
 
-void vSmpForeverTestTask( void *pvParameters )
-{
-    for(;;)
-    {
-    }
-}
-
 void show_task_status( void )
 {
     UBaseType_t uxIdx;
@@ -193,24 +186,22 @@ Coverage for
     void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
     covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
     implicitly referring to the current task.
+
+Note:
+    I need to figure out how to run vTaskCoreAffinitySet with pxCurrentTCB set to the TCB for
+    the vSmpTestTask
 */
 
-void vSmpTestTaskSetAffinity( void *pvParameters )
-{
-    vTaskCoreAffinitySet(NULL, (UBaseType_t)0xFF);
-
-    for(;;)
-    {
-    }
-}
 
 void test_task_core_affinity_set_task_implied( void )
 {
     TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
 
-    xTaskCreate( vSmpTestTaskSetAffinity, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
 
     vTaskStartScheduler();
+    
+    // vTaskCoreAffinitySet(NULL, (UBaseType_t)0xFF);
 }
 
 /*
@@ -244,24 +235,25 @@ Coverage for
     covers the case where the affinity mask no longer includes the current core, triggering a yield
 */
 
-void vSmpTestTaskChangeAffinity( void *pvParameters )
-{
-    vTaskDelay(pdMS_TO_TICKS(100));
-    vTaskCoreAffinitySet(NULL, (UBaseType_t)0x2);
-
-    for(;;)
-    {
-    }
-}
-
 void test_task_core_affinity_change_while_running( void )
 {
     TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    UBaseType_t xidx;
 
-    xTaskCreate( vSmpTestTaskChangeAffinity, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0]);
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0]);
     vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x1);
 
     vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x2);
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
 }
 
 /*
@@ -319,22 +311,24 @@ Coverage for
     Call the above macro where the second expression evaluates to false.
 */
 
-void vSmpTestTaskSetAffinityWithInvalidRunningCore( void *pvParameters )
-{
-    //pxCurrentTCB.xTaskRunState = configNUMBER_OF_CORES+1;
-    vTaskCoreAffinitySet(NULL, (UBaseType_t)0x2);
-
-    for(;;)
-    {
-    }
-}
-
 void test_task_core_affinity_set_with_invalid_running_core( void )
 {
     TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    UBaseType_t xidx;
 
-    xTaskCreate( vSmpTestTaskSetAffinityWithInvalidRunningCore, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
     vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x1);
 
     vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    //pxCurrentTCB.xTaskRunState = configNUMBER_OF_CORES+1;
+    vTaskCoreAffinitySet(NULL, (UBaseType_t)0x2);
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
 }
