@@ -186,22 +186,23 @@ Coverage for
     void vTaskCoreAffinitySet( const TaskHandle_t xTask, UBaseType_t uxCoreAffinityMask )
     covers the case where vTaskCoreAffinitySet is called with NULL being passed to xTask 
     implicitly referring to the current task.
-
-Note:
-    I need to figure out how to run vTaskCoreAffinitySet with pxCurrentTCB set to the TCB for
-    the vSmpTestTask
 */
 
 
 void test_task_core_affinity_set_task_implied( void )
 {
     TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    UBaseType_t xidx;
 
     xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
 
     vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
     
-    // vTaskCoreAffinitySet(NULL, (UBaseType_t)0xFF);
+    vTaskCoreAffinitySet(NULL, (UBaseType_t)0xFF);
 }
 
 /*
@@ -325,8 +326,8 @@ void test_task_core_affinity_set_with_invalid_running_core( void )
         xTaskIncrementTick_helper();
     }
 
-    //pxCurrentTCB.xTaskRunState = configNUMBER_OF_CORES+1;
-    vTaskCoreAffinitySet(NULL, (UBaseType_t)0x2);
+    xTaskHandles[0]->xTaskRunState = configNUMBER_OF_CORES+1;
+    vTaskCoreAffinitySet(xTaskHandles[0], (UBaseType_t)0x2);
 
     for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
         xTaskIncrementTick_helper();
