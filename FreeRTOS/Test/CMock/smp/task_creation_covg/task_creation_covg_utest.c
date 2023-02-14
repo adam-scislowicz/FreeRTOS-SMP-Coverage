@@ -415,7 +415,7 @@ void test_coverage_vTaskGetInfo_blocked_task( void )
     TaskStatus_t pxTaskStatus;
     UBaseType_t xidx;
     BaseType_t xFreeStackSpace = pdTRUE;
-    eTaskState taskState = eReady;
+    eTaskState taskState = eSuspended;
 
     xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
 
@@ -425,16 +425,7 @@ void test_coverage_vTaskGetInfo_blocked_task( void )
         xTaskIncrementTick_helper();
     }
 
-    vTaskSuspend(xTaskHandles[0]);
-
-    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
-        xTaskIncrementTick_helper();
-    }
-
-    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
-        xTaskIncrementTick_helper();
-    }
-
+    xTaskHandles[0]->xEventListItem.pxContainer = (struct xLIST *) 1;
     vTaskGetInfo( xTaskHandles[0], &pxTaskStatus, xFreeStackSpace, taskState);
 
     printf("DEBUG: taskState: %d\n", (int)taskState);
