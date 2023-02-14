@@ -333,3 +333,167 @@ void test_task_core_affinity_set_with_invalid_running_core( void )
         xTaskIncrementTick_helper();
     }
 }
+
+/*
+The kernel will be configured as follows:
+    #define configUSE_TRACE_FACILITY                        1
+
+Coverage for
+    void vTaskGetInfo( TaskHandle_t xTask,
+                       TaskStatus_t * pxTaskStatus,
+                       BaseType_t xGetFreeStackSpace,
+                       eTaskState eState )
+    Call vTaskGetInfo with xTask as NULL, so that implicitly uses the current task.
+*/
+
+void test_coverage_vTaskGetInfo_implicit_task( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    TaskStatus_t pxTaskStatus;
+    UBaseType_t xidx;
+    BaseType_t xFreeStackSpace = pdTRUE;
+    eTaskState taskState = eReady;
+
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+
+    vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+    
+    vTaskGetInfo( NULL, &pxTaskStatus, xFreeStackSpace, taskState);
+}
+
+/*
+The kernel will be configured as follows:
+    #define configUSE_TRACE_FACILITY                        1
+
+Coverage for
+    void vTaskGetInfo( TaskHandle_t xTask,
+                       TaskStatus_t * pxTaskStatus,
+                       BaseType_t xGetFreeStackSpace,
+                       eTaskState eState )
+    Call vTaskGetInfo with an explicit task.
+*/
+
+void test_coverage_vTaskGetInfo_explicit_task( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    TaskStatus_t pxTaskStatus;
+    UBaseType_t xidx;
+    BaseType_t xFreeStackSpace = pdTRUE;
+    eTaskState taskState = eReady;
+
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+
+    vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+    
+    vTaskGetInfo( xTaskHandles[0], &pxTaskStatus, xFreeStackSpace, taskState);
+}
+
+/*
+The kernel will be configured as follows:
+    #define configUSE_TRACE_FACILITY                        1
+
+Coverage for
+    void vTaskGetInfo( TaskHandle_t xTask,
+                       TaskStatus_t * pxTaskStatus,
+                       BaseType_t xGetFreeStackSpace,
+                       eTaskState eState )
+    Call vTaskGetInfo on a suspended task with a non-NULL xEventListItem such that it reports
+    that it is blocked.
+*/
+
+void test_coverage_vTaskGetInfo_blocked_task( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    TaskStatus_t pxTaskStatus;
+    UBaseType_t xidx;
+    BaseType_t xFreeStackSpace = pdTRUE;
+    eTaskState taskState = eReady;
+
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+
+    vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    vTaskSuspend(xTaskHandles[0]);
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    vTaskGetInfo( xTaskHandles[0], &pxTaskStatus, xFreeStackSpace, taskState);
+
+    printf("DEBUG: taskState: %d\n", (int)taskState);
+}
+
+
+/*
+Coverage for
+    void vTaskGetInfo( TaskHandle_t xTask,
+                       TaskStatus_t * pxTaskStatus,
+                       BaseType_t xGetFreeStackSpace,
+                       eTaskState eState )
+    Call vTaskGetInfo with xTaskRunState >= configNUMBER_OF_CORES.
+*/
+
+void test_coverage_vTaskGetInfo_oob_xTaskRunState( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    TaskStatus_t pxTaskStatus;
+    UBaseType_t xidx;
+    BaseType_t xFreeStackSpace = pdTRUE;
+    eTaskState taskState = eReady;
+
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+
+    vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    xTaskHandles[0]->xTaskRunState = configNUMBER_OF_CORES;
+    vTaskGetInfo( xTaskHandles[0], &pxTaskStatus, xFreeStackSpace, taskState);
+}
+
+/*
+Coverage for
+    void vTaskGetInfo( TaskHandle_t xTask,
+                       TaskStatus_t * pxTaskStatus,
+                       BaseType_t xGetFreeStackSpace,
+                       eTaskState eState )
+    Call vTaskGetInfo xGetFreeStackSpace set to pdFALSE.
+*/
+
+void test_coverage_vTaskGetInfo_skip_get_free_stack_space( void )
+{
+    TaskHandle_t xTaskHandles[configNUMBER_OF_CORES] = { NULL };
+    TaskStatus_t pxTaskStatus;
+    UBaseType_t xidx;
+    BaseType_t xFreeStackSpace = pdFALSE;
+    eTaskState taskState = eReady;
+
+    xTaskCreate( vSmpTestTask, "SMP Task", configMINIMAL_STACK_SIZE, NULL, 1, &xTaskHandles[0] );
+
+    vTaskStartScheduler();
+
+    for (xidx = 0; xidx < configNUMBER_OF_CORES ; xidx++) {
+        xTaskIncrementTick_helper();
+    }
+
+    vTaskGetInfo( xTaskHandles[0], &pxTaskStatus, xFreeStackSpace, taskState);
+}
